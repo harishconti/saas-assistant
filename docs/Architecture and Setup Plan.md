@@ -51,9 +51,9 @@ flowchart LR
     end
 
     subgraph LLMs[LLM Providers]
-      OLL[Ollama (Local Models)]
-      CLAUDE[Claude 3.5]
-      GEM[Gemini 2.x]
+      OLL[Ollama (Local & Cloud Tunnel)]
+      OR[OpenRouter (Gemini, Kimi, Qwen, Minimax)]
+      ZAI[Z.ai GLM-4.7 (Coding)]
     end
 
     subgraph Retrieval[Airweave]
@@ -81,8 +81,8 @@ flowchart LR
 
     TEAM -->|LLM calls| LLMGW
     LLMGW --> OLL
-    LLMGW --> CLAUDE
-    LLMGW --> GEM
+    LLMGW --> OR
+    LLMGW --> ZAI
 
     TEAM -->|Context queries| AWAPI
     AWAPI --> AWDB
@@ -105,15 +105,31 @@ This diagram shows the FastAPI backend coordinating an Agno multi-agent team, wh
 
 ### LiteLLM Gateway
 
-LiteLLM is a Python SDK and proxy server that offers an OpenAI-compatible API to route calls to more than 100 LLM providers, including Ollama, Anthropic, and Google Gemini.[^7][^1]
+LiteLLM is a Python SDK and proxy server that offers an OpenAI-compatible API to route calls to more than 100 LLM providers, including OpenRouter, Z.ai, and Ollama.[^7]
 
 In this architecture it:
 
 - Exposes a single endpoint (e.g., `http://localhost:4000/chat/completions`).
-- Maps **virtual model names** (e.g., `intent-model`, `worker-model`, `architect-model`) to real models (Ollama local models and cloud models).
-- Enforces **token budgets and rate limits**.
-- Implements **fallback chains** (e.g., Claude 3.5 → Gemini → Qwen via Ollama) when budgets or context limits are exceeded.[^8][^9]
+- Maps **virtual model names** (e.g., `intent-model`, `worker-model`, `architect-model`, `developer-model`, `architect-model`, `critic-model`) to real models defined in `gateway/litellm_config.yaml`:
+  - `intent-model` → OpenRouter Gemini 2.5 Flash, with ministral and Ollama fallbacks.
+  - `worker-model` → OpenRouter Ministral 8B, with Ollama ministral fallback.
+  - `developer-model` → Z.ai `glm-4.7` coding endpoint, with OpenRouter Qwen 2.5 Coder and Ollama coder fallbacks.
+  - `architect-model` → OpenRouter Kimi K2, with Qwen Plus and Ollama Qwen fallbacks.
+  - `critic-model` → OpenRouter Gemini 2.5 Flash, with Minimax and Ollama fallbacks.[^7][^8][^9]
+- Enforces **token budgets and rate limits** via LiteLLM’s routing and retry config.
+- Implements **fallback chains** so that if a provider is rate limited or out of quota (e.g., Z.ai Lite coding plan), calls are automatically routed to the next best model.
 - Streams telemetry to Langfuse for observability.[^10]
+
+### Current Model Assignments
+
+| Agent Role | Virtual Model ID   | Primary Provider/Model                            | Fallbacks                                         |
+|-----------|--------------------|---------------------------------------------------|---------------------------------------------------|
+| Manager   | `intent-model`     | OpenRouter `google/gemini-2.5-flash`              | Ollama `gemini-3-flash-preview:cloud`, Ministral 3B |
+| Worker    | `worker-model`     | OpenRouter `mistralai/ministral-8b-2512`          | Ollama `ministral-3:8b-cloud`                     |
+| Developer | `developer-model`  | Z.ai `glm-4.7` (coding endpoint)                  | OpenRouter `qwen-2.5-coder-32b`, Ollama coder     |
+| Architect | `architect-model`  | OpenRouter `moonshotai/kimi-k2`                   | OpenRouter `qwen-plus`, Ollama `qwen3.5:397b-cloud` |
+| Critic    | `critic-model`     | OpenRouter `google/gemini-2.5-flash`              | OpenRouter `minimax-m2.5`, Ollama `qwen3.5:397b-cloud` |
+
 
 This decouples model choice from agent logic: Agno agents only reference virtual model IDs.
 
@@ -325,12 +341,13 @@ Core packages:
 ### External Services and API Keys
 
 - Railway: `RAILWAY_TOKEN`, `POSTGRES_URL`, `REDIS_URL`.
-- Anthropic: `ANTHROPIC_API_KEY`.
-- Google AI Studio: `GEMINI_API_KEY`.
+- OpenRouter: `OPENROUTER_API_KEY` (primary cloud LLM provider for Gemini 2.5 Flash, Ministral, Kimi K2, Qwen Plus, Minimax).
+- Z.ai: `ZAI_API_KEY` (GLM‑4.7 coding endpoint for the Developer agent; Lite/Coding plan quota is enforced on Z.ai’s side).
 - Airweave: `AIRWEAVE_API_KEY`, collection IDs.
 - Langfuse: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`.[^10]
 - Mem0: `MEM0_API_KEY`.[^13]
 - GitHub: `GITHUB_PAT` with repo scope.
+- (Optional) Google Cloud / Vertex AI: project and credentials if you later choose to call Gemini or Claude directly instead of via OpenRouter.
 
 All secrets should be stored in a `.env` file for local development and configured as environment variables in Railway for production.
 
@@ -346,8 +363,9 @@ All secrets should be stored in a `.env` file for local development and configur
    - Enable or configure a sandbox/compute service for code execution.[^6]
 
 2. **LLM Providers**
-   - Anthropic: create an account, supply billing, generate API key.
-   - Google AI Studio: enable Gemini API, generate API key.
+   - OpenRouter: create an account at [openrouter.ai](https://openrouter.ai), add credits, and generate an API key.
+   - Z.ai: create an account at [z.ai](https://z.ai), obtain a coding-plan API key for GLM-4.7.
+   - (Optional) Ollama: install locally or use the cloud tunnel for fallback models.
 
 3. **Airweave**
    - Sign up or deploy Airweave.
@@ -501,3 +519,12 @@ This design is well aligned with the given hardware (Ryzen 7, 32 GB RAM, RTX 305
 
 13. [Pipeline Logic](https://developer.hpe.com/blog/post-9-agentic-ai-with-agno-ollama-and-local-llama3/) - The HPE Developer portal
 
+- [GitHub - BerriAI/litellm](https://github.com/BerriAI/litellm/)
+- [Z.ai Coding API Documentation](https://api.z.ai/docs)
+- [OpenRouter Model Index](https://openrouter.ai/models)
+
+## Future Extensions
+
+- Integrate Perplexity `pplx-api` via LiteLLM for search-augmented reasoning.
+- Add Vertex AI / Antigravity as a direct provider when API quotas and billing are stable.
+- Experiment with AirLLM for local 70B+ models on constrained GPUs if offline inference becomes required.
