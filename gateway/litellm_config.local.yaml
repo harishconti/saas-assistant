@@ -1,0 +1,117 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LiteLLM Local Dev Config (no Docker, uses host Ollama + OpenRouter)
+# No master_key — avoids Prisma/PostgreSQL requirement for local testing.
+# ─────────────────────────────────────────────────────────────────────────────
+
+model_list:
+  # ── Intent Router ──────────────────────────────────────────────────────────
+  - model_name: intent-model
+    litellm_params:
+      model: openrouter/google/gemini-2.5-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 2048
+
+  - model_name: intent-model
+    litellm_params:
+      model: ollama/gemini-3-flash-preview:cloud
+      api_base: http://localhost:11434
+      max_tokens: 2048
+
+  - model_name: intent-model
+    litellm_params:
+      model: openrouter/mistralai/ministral-3b-2512
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 2048
+
+  # ── Worker ─────────────────────────────────────────────────────────────────
+  - model_name: worker-model
+    litellm_params:
+      model: openrouter/mistralai/ministral-8b-2512
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 4096
+
+  - model_name: worker-model
+    litellm_params:
+      model: ollama/ministral-3:8b-cloud
+      api_base: http://localhost:11434
+      max_tokens: 4096
+
+  # ── Developer ──────────────────────────────────────────────────────────────
+  # z.ai GLM-4.7: coding-plan endpoint (quota refreshes every 5h)
+  - model_name: developer-model
+    litellm_params:
+      model: openai/glm-4.7
+      api_base: https://api.z.ai/api/coding/paas/v4
+      api_key: os.environ/ZAI_API_KEY
+      max_tokens: 8192
+
+  # Fallback 1: OpenRouter Qwen-2.5-Coder-32b
+  - model_name: developer-model
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-coder-32b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 8192
+
+  # Fallback 2: Ollama qwen3-coder
+  - model_name: developer-model
+    litellm_params:
+      model: ollama/qwen3-coder-next:cloud
+      api_base: http://localhost:11434
+      max_tokens: 8192
+
+  # Fallback 3: Ministral 14b
+  - model_name: developer-model
+    litellm_params:
+      model: ollama/ministral-3:14b-cloud
+      api_base: http://localhost:11434
+      max_tokens: 8192
+
+
+  - model_name: architect-model
+    litellm_params:
+      model: openrouter/moonshotai/kimi-k2
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 16384
+
+  - model_name: architect-model
+    litellm_params:
+      model: openrouter/qwen/qwen-plus
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 16384
+
+  - model_name: architect-model
+    litellm_params:
+      model: ollama/qwen3.5:397b-cloud
+      api_base: http://localhost:11434
+      max_tokens: 16384
+
+  # ── Critic ─────────────────────────────────────────────────────────────────
+  - model_name: critic-model
+    litellm_params:
+      model: openrouter/google/gemini-2.5-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 8192
+
+  - model_name: critic-model
+    litellm_params:
+      model: openrouter/minimax/minimax-m2.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 8192
+
+  - model_name: critic-model
+    litellm_params:
+      model: ollama/qwen3.5:397b-cloud
+      api_base: http://localhost:11434
+      max_tokens: 8192
+
+# ─────────────────────────────────────────────────────────────────────────────
+router_settings:
+  routing_strategy: least-busy
+  num_retries: 2
+  retry_after: 5
+
+litellm_settings:
+  store_model_in_db: false
+  disable_spend_logs: true
+  drop_params: true
+  request_timeout: 120

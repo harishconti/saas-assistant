@@ -1,0 +1,133 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# LiteLLM Proxy Config — SaaS Assistant (Production / Docker)
+# All cloud models routed via OpenRouter. Ollama cloud tunnel as fallback.
+# LiteLLM docs: https://docs.litellm.ai/docs/providers/openrouter
+# Model IDs from: https://openrouter.ai/api/v1/models (fetched March 2026)
+# ─────────────────────────────────────────────────────────────────────────────
+
+model_list:
+  # ── Intent Router ──────────────────────────────────────────────────────────
+  # gemini-2.5-flash: 1M ctx, $0.0000003/tok, excellent at routing/classification
+  - model_name: intent-model
+    litellm_params:
+      model: openrouter/google/gemini-2.5-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 2048
+
+  # Fallback 1: Ollama cloud tunnel (Gemini)
+  - model_name: intent-model
+    litellm_params:
+      model: ollama/gemini-3-flash-preview:cloud
+      api_base: http://host.docker.internal:11434
+      max_tokens: 2048
+
+  # Fallback 2: small Ministral via OpenRouter
+  - model_name: intent-model
+    litellm_params:
+      model: openrouter/mistralai/ministral-3b-2512
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 2048
+
+  # ── Worker (General-Purpose) ────────────────────────────────────────────────
+  # ministral-8b-2512: 262K ctx, $0.00000015/tok, fast and compact
+  - model_name: worker-model
+    litellm_params:
+      model: openrouter/mistralai/ministral-8b-2512
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 4096
+
+  # Fallback: Ollama cloud tunnel
+  - model_name: worker-model
+    litellm_params:
+      model: ollama/ministral-3:8b-cloud
+      api_base: http://host.docker.internal:11434
+      max_tokens: 4096
+
+  # ── Developer (Code Generation) ────────────────────────────────────────────
+  # z.ai GLM-4.7: coding-plan endpoint — includes reasoning_content (quota: ~80 req/5h)
+  - model_name: developer-model
+    litellm_params:
+      model: openai/glm-4.7
+      api_base: https://api.z.ai/api/coding/paas/v4
+      api_key: os.environ/ZAI_API_KEY
+      max_tokens: 8192
+
+  # Fallback 1: OpenRouter Qwen-2.5-Coder-32b (qwen-2.5-coder-32b: top OSS coder, 32K ctx)
+  - model_name: developer-model
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-coder-32b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 8192
+
+  - model_name: developer-model
+    litellm_params:
+      model: ollama/qwen3-coder-next:cloud
+      api_base: http://host.docker.internal:11434
+      max_tokens: 8192
+
+  # Fallback 2: Ministral 14b
+  - model_name: developer-model
+    litellm_params:
+      model: ollama/ministral-3:14b-cloud
+      api_base: http://host.docker.internal:11434
+      max_tokens: 8192
+
+  # ── Architect (Requirements + Planning) ────────────────────────────────────
+  # kimi-k2: 131K ctx, strong long-context reasoning, $0.00000055/tok
+  - model_name: architect-model
+    litellm_params:
+      model: openrouter/moonshotai/kimi-k2
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 16384
+
+  # Fallback 1: qwen-plus (1M ctx)
+  - model_name: architect-model
+    litellm_params:
+      model: openrouter/qwen/qwen-plus
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 16384
+
+  # Fallback 2: Ollama qwen3.5 397b
+  - model_name: architect-model
+    litellm_params:
+      model: ollama/qwen3.5:397b-cloud
+      api_base: http://host.docker.internal:11434
+      max_tokens: 16384
+
+  # ── Critic (Code Review) ───────────────────────────────────────────────────
+  # gemini-2.5-flash: 1M ctx, fast feedback loop for code review
+  - model_name: critic-model
+    litellm_params:
+      model: openrouter/google/gemini-2.5-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 8192
+
+  # Fallback 1: minimax-m2.5
+  - model_name: critic-model
+    litellm_params:
+      model: openrouter/minimax/minimax-m2.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      max_tokens: 8192
+
+  # Fallback 2: Ollama qwen3.5
+  - model_name: critic-model
+    litellm_params:
+      model: ollama/qwen3.5:397b-cloud
+      api_base: http://host.docker.internal:11434
+      max_tokens: 8192
+
+# ─────────────────────────────────────────────────────────────────────────────
+router_settings:
+  routing_strategy: least-busy
+  num_retries: 2
+  retry_after: 5
+
+litellm_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+  langfuse_public_key: os.environ/LANGFUSE_PUBLIC_KEY
+  langfuse_secret_key: os.environ/LANGFUSE_SECRET_KEY
+  langfuse_host: os.environ/LANGFUSE_HOST
+  drop_params: true
+  request_timeout: 120

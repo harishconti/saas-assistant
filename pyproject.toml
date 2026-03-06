@@ -1,0 +1,21 @@
+[project]
+name = "saas-assistant"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "agno>=2.5.7",
+    "airweave-sdk>=0.9.11",
+    "fastapi>=0.135.1",
+    "httpx>=0.28.1",
+    "langfuse>=3.14.5",
+    "litellm>=1.82.0",
+    "mem0ai>=1.0.5",
+    "psycopg2-binary>=2.9.11",
+    "pydantic>=2.12.5",
+    "pytest>=9.0.2",
+    "python-dotenv>=1.2.2",
+    "redis>=7.2.1",
+    "uvicorn>=0.41.0",
+]
