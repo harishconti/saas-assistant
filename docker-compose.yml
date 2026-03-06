@@ -63,6 +63,37 @@ services:
       timeout: 5s
       retries: 3
 
+  # ──────────────────────────────────────────────────────────────────────────────
+  # SaaS Assistant — The main multi-agent team API
+  # ──────────────────────────────────────────────────────────────────────────────
+  app:
+    build: .
+    container_name: saas-assistant
+    ports:
+      - "8000:8000"
+    environment:
+      - LITELLM_PROXY_URL=http://litellm:4000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-saas_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-saas_assistant}
+      - REDIS_URL=redis://redis:6379/0
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      - AIRWEAVE_API_KEY=${AIRWEAVE_API_KEY}
+      - MEM0_API_KEY=${MEM0_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # Sandbox credentials for remote execution
+      - SANDBOX_ENDPOINT_URL=${SANDBOX_ENDPOINT_URL}
+      - SANDBOX_API_KEY=${SANDBOX_API_KEY}
+    depends_on:
+      litellm:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

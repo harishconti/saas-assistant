@@ -1,5 +1,6 @@
 from src.agents.base import BaseAgent
 from src.schemas.workflow import TestResult
+from src.execution.sandbox import SandboxManager
 
 class TesterAgent(BaseAgent):
     """
@@ -8,6 +9,7 @@ class TesterAgent(BaseAgent):
     Runs the sandbox environment to ensure the code works as expected.
     """
     def __init__(self, **kwargs):
+        self.sandbox = SandboxManager()
         super().__init__(
             role_name="Tester",
             model_id="worker-model", # Routes to Ministral 8b (fast, good log parsing)
@@ -26,9 +28,7 @@ class TesterAgent(BaseAgent):
 
     def execute_tests(self, command: str) -> str:
         """
-        Placeholder tool for Railway Sandbox execution.
-        Currently returns a mocked success to allow the workflow to be tested.
-        Phase 4 will replace this with actual ComputeSDK remote execution.
+        Executes a command (e.g., test suite) in the remote Railway sandbox.
         """
         print(f"    [Tester executing sandbox command: {command}]")
-        return "STDOUT: pytest execution complete. 1 passed, 0 failed.\nExit code: 0"
+        return self.sandbox.run_command_sync(command)
